@@ -47,15 +47,16 @@ def build_module_index(py_files: list[FileInfo]) -> dict[str, str]:
     return index
 
 
-def _extract_imports(tree: ast.Module) -> list[tuple[str, int]]:
+def _extract_imports(tree: ast.Module) -> list[tuple[str | None, int, list[str]]]:
     imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append((alias.name, 0))
+                imports.append((alias.name, 0, []))
         elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                imports.append((node.module, node.level))
+            # node.module is None for bare "from . import x" - don't skip it
+            names = [a.name for a in node.names]
+            imports.append((node.module, node.level, names))
     return imports
 
 
@@ -91,16 +92,35 @@ def parse_python_file(file_info: FileInfo, module_index: dict[str, str]) -> Pars
     complexity = 1 + sum(1 for n in ast.walk(tree) if isinstance(n, COMPLEXITY_NODES))
 
     deps = []
-    for mod_name, level in _extract_imports(tree):
+    for mod_name, level, names in _extract_imports(tree):
         if level > 0:
             resolved = _resolve_relative(file_info.relative_path, mod_name, level)
         else:
             resolved = mod_name
 
-        if resolved and resolved in module_index:
-            path = module_index[resolved]
-            if path != file_info.relative_path:
-                deps.append(path)
+        if not resolved:
+            continue
+
+        if names:
+            # "from x import a, b" - each name might be a submodule file or just an
+            # attribute inside __init__.py, need to check per name not per statement
+            # e.g. "from routers import users" -> routers/users.py not routers/__init__.py
+            for name in names:
+                sub = f"{resolved}.{name}"
+                if sub in module_index:
+                    path = module_index[sub]
+                    if path != file_info.relative_path and path not in deps:
+                        deps.append(path)
+                elif resolved in module_index:
+                    path = module_index[resolved]
+                    if path != file_info.relative_path and path not in deps:
+                        deps.append(path)
+        else:
+            # plain "import x.y.z"
+            if resolved in module_index:
+                path = module_index[resolved]
+                if path != file_info.relative_path and path not in deps:
+                    deps.append(path)
 
     return ParsedFile(file_info.relative_path, total, code, complexity, deps)
 
