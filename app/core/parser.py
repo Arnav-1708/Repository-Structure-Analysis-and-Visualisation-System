@@ -1,7 +1,19 @@
+"""
+Parses python files to extract LOC, a rough complexity number, and
+which other repo files they import. Uses ast so we're not actually
+running any code.
+
+Non-python files still get a LOC count, just no dependency info.
+"""
+
 import ast
 from dataclasses import dataclass, field
 
 from app.core.scanner import FileInfo
+
+# nodes that add branches - rough stand-in for cyclomatic complexity
+# not super accurate but good enough to flag files that are too long
+COMPLEXITY_NODES = (ast.If, ast.For, ast.While, ast.Try, ast.ExceptHandler, ast.With, ast.BoolOp)
 
 
 @dataclass
@@ -17,11 +29,13 @@ class ParsedFile:
 def _count_lines(text: str) -> tuple[int, int]:
     lines = text.splitlines()
     total = len(lines)
+    # code lines = non-empty, non-comment lines
     code = sum(1 for l in lines if l.strip() and not l.strip().startswith("#"))
     return total, code
 
 
 def build_module_index(py_files: list[FileInfo]) -> dict[str, str]:
+    """dotted module name -> relative file path, e.g. 'app.core.scanner' -> 'app/core/scanner.py'"""
     index: dict[str, str] = {}
     for f in py_files:
         parts = f.relative_path[:-3].split("/")
@@ -33,16 +47,31 @@ def build_module_index(py_files: list[FileInfo]) -> dict[str, str]:
     return index
 
 
-def _extract_imports(tree: ast.Module) -> list[str]:
+def _extract_imports(tree: ast.Module) -> list[tuple[str, int]]:
     imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append(alias.name)
+                imports.append((alias.name, 0))
         elif isinstance(node, ast.ImportFrom):
-            if node.module and node.level == 0:
-                imports.append(node.module)
+            if node.module:
+                imports.append((node.module, node.level))
     return imports
+
+
+def _resolve_relative(file_path: str, module: str | None, level: int) -> str | None:
+    parts = file_path[:-3].split("/")
+    package = parts[:-1]
+
+    # level 1 = same package, level 2 = one up, etc
+    up = level - 1
+    if up > len(package):
+        return None
+    base = package[: len(package) - up] if up else package
+
+    if module:
+        return ".".join(base + module.split("."))
+    return ".".join(base) if base else None
 
 
 def parse_python_file(file_info: FileInfo, module_index: dict[str, str]) -> ParsedFile:
@@ -56,16 +85,24 @@ def parse_python_file(file_info: FileInfo, module_index: dict[str, str]) -> Pars
     try:
         tree = ast.parse(text)
     except SyntaxError:
+        # return the LOC even if ast chokes on it
         return ParsedFile(file_info.relative_path, total, code, parse_error=True)
 
+    complexity = 1 + sum(1 for n in ast.walk(tree) if isinstance(n, COMPLEXITY_NODES))
+
     deps = []
-    for mod_name in _extract_imports(tree):
-        if mod_name in module_index:
-            path = module_index[mod_name]
+    for mod_name, level in _extract_imports(tree):
+        if level > 0:
+            resolved = _resolve_relative(file_info.relative_path, mod_name, level)
+        else:
+            resolved = mod_name
+
+        if resolved and resolved in module_index:
+            path = module_index[resolved]
             if path != file_info.relative_path:
                 deps.append(path)
 
-    return ParsedFile(file_info.relative_path, total, code, dependencies=deps)
+    return ParsedFile(file_info.relative_path, total, code, complexity, deps)
 
 
 def parse_repository(files: list[FileInfo]) -> list[ParsedFile]:
