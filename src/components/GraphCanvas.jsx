@@ -9,6 +9,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import FileNode from "./FileNode";
 import { useGraphStore } from "../store/useGraphStore";
+import { useSummarizeOnSelect } from "../hooks/useSummarizeOnSelect";
 
 // Registers custom node type with React Flow.
 // Key ("file") must match the `type: "file"` we set on each node in App.jsx.
@@ -17,9 +18,9 @@ const nodeTypes = { file: FileNode };
 function GraphCanvas() {
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
-  const selectNode = useGraphStore((state) => state.selectNode);
   const setGraph = useGraphStore((state) => state.setGraph);
   const rootPath = useGraphStore((state) => state.rootPath);
+  const selectAndSummarize = useSummarizeOnSelect();
 
   // Lets users drag nodes around — without this, the canvas renders
   // but nodes would be frozen in place.
@@ -36,8 +37,8 @@ function GraphCanvas() {
   );
 
   const onNodeClick = useCallback(
-    (_event, node) => selectNode(node.id),
-    [selectNode]
+    (_event, node) => selectAndSummarize(node.id),
+    [selectAndSummarize]
   );
 
   return (
