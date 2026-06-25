@@ -1,16 +1,95 @@
-# React + Vite
+# GDSC Frontend — Repository Structure Analysis & Visualisation System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The frontend for a tool that scans a local Git repository and renders its
+file structure, import dependencies, and code metrics as an interactive,
+draggable graph. Clicking any file shows an AI-generated summary of what
+that file does.
 
-Currently, two official plugins are available:
+Built with **React + Vite** and **React Flow** for the canvas. State is
+managed with **Zustand**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech stack
 
-## React Compiler
+- React 18 + Vite
+- [reactflow](https://reactflow.dev/) — draggable node/edge canvas
+- [zustand](https://github.com/pmndrs/zustand) — global state store
+- [axios](https://axios-http.com/) — HTTP requests to the backend
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Getting started
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open the local URL Vite prints (typically `http://localhost:5173`).
+
+## Mock data vs. real backend
+
+This frontend was built against **mock data** that exactly matches the
+backend's real response shape, so frontend and backend work could happen
+in parallel.
+
+By default, the app uses mock data (`src/data/mockGraph.js`) and does not
+require the backend to be running.
+
+To connect to the real backend instead:
+
+1. Make sure the backend is running locally (see backend README), typically:
+```bash
+   uvicorn app.main:app --reload --port 8000
+```
+2. Create a `.env` file in this project's root:
+VITE_USE_MOCK=false
+VITE_API_BASE_URL=http://localhost:8000
+
+3. Restart `npm run dev` (Vite only reads `.env` on startup).
+
+No component code needs to change — `src/api/graphApi.js` is the only
+file that knows about mock vs. real data.
+
+> **Note:** if you see a CORS error in the browser console once
+> connected to the real backend, the backend needs to allow requests
+> from `http://localhost:5173` via FastAPI's `CORSMiddleware`.
+
+## API contract (backend)
+
+**POST `/api/scan`** — body: `{ "path": "/some/repo" }`
+Scans a directory and returns the graph:
+```json
+{
+  "root_path": "...",
+  "nodes": [
+    { "id": "app/main.py", "label": "main.py", "extension": "py",
+      "metrics": { "loc": 18, "complexity": 1, "size_bytes": 512 } }
+  ],
+  "edges": [
+    { "id": "app/main.py->app/core/config.py",
+      "source": "app/main.py", "target": "app/core/config.py" }
+  ]
+}
+```
+
+**GET `/api/graph`** — returns the last scan result without re-scanning.
+
+**POST `/api/summarize`** — body: `{ "root_path": "...", "relative_path": "app/main.py" }`
+Response: `{ "relative_path": "app/main.py", "summary": "...", "cached": false }`
+
+**GET `/api/health`** — health check.
+
+## How the layout works
+
+The backend only knows *which files depend on which* — it doesn't say
+where to draw anything. `src/utils/layout.js` computes each file's
+"depth" in the dependency graph (files with no imports are depth 0,
+files that import them are depth 1, etc.) and arranges files at the same
+depth in a row. This produces a top-to-bottom dependency flow rather
+than a random scatter.
+
+## Client-side summary caching
+
+The backend caches AI summaries by file content hash, so the same
+unchanged file is never re-sent to the AI API twice. The frontend adds
+a second layer of caching in the Zustand store (`src/store/useGraphStore.js`):
+once a summary has been fetched for a node in the current session, clicking
+that node again reuses the cached result instantly with no network call.

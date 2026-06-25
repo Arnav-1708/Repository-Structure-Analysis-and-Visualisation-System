@@ -38,19 +38,41 @@ function App() {
     loadGraph();
   }, []);
 
-  return (
-    <div style={{ display: "flex", width: "100vw", height: "100vh" }}>
-      <div style={{ flex: 1, position: "relative" }}>
-        {isGraphLoading && !hasLoaded && (
-          <CenteredMessage text="Scanning repository…" />
-        )}
-        {graphError && <CenteredMessage text={`Error: ${graphError}`} isError />}
-        {!isGraphLoading && !graphError && <GraphCanvas />}
+return (
+    <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh" }}>
+      <header style={headerStyle}>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>
+          Repository Structure Analysis & Visualisation
+        </span>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>
+          {hasLoaded && !graphError ? "Scan complete" : ""}
+        </span>
+      </header>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          {isGraphLoading && !hasLoaded && (
+            <CenteredMessage text="Scanning repository…" />
+          )}
+          {graphError && <CenteredMessage text={`Error: ${graphError}`} isError />}
+          {!isGraphLoading && !graphError && <GraphCanvas />}
+        </div>
+        <SummaryPanel />
       </div>
-      <SummaryPanel />
     </div>
   );
 }
+
+const headerStyle = {
+  height: 44,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #e5e7eb",
+  background: "#ffffff",
+  fontFamily: "system-ui, sans-serif",
+  boxSizing: "border-box",
+};
 
 function CenteredMessage({ text, isError }) {
   return (

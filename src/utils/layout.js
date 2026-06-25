@@ -11,8 +11,8 @@
 // repos it produces a readable left-to-right (or top-to-bottom) dependency
 // flow, which is exactly what dependency-cruiser style tools aim for.
 
-const ROW_HEIGHT = 140;
-const COLUMN_WIDTH = 220;
+const ROW_HEIGHT = 160;
+const COLUMN_WIDTH = 260;
 
 function computeDepths(nodeIds, edges) {
   // adjacency: for each node, list of nodes it depends on (its imports)
