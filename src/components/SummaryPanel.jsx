@@ -1,8 +1,16 @@
 import { useGraphStore } from "../store/useGraphStore";
 
 function SummaryPanel() {
+  // IMPORTANT: subscribe directly to the store slices this component
+  // actually needs (selectedNodeId, nodes, summaries). Calling a getter
+  // function like getSelectedNodeInfo() inside the render body does NOT
+  // tell Zustand to re-render when the data inside that function changes —
+  // Zustand only re-renders based on what was passed to useGraphStore(...).
+  // That was the bug: summaries updated correctly in the store, but the
+  // panel never knew to re-render and pick up the new value.
   const selectedNodeId = useGraphStore((state) => state.selectedNodeId);
-  const getSelectedNodeInfo = useGraphStore((state) => state.getSelectedNodeInfo);
+  const nodes = useGraphStore((state) => state.nodes);
+  const summaries = useGraphStore((state) => state.summaries);
   const clearSelection = useGraphStore((state) => state.clearSelection);
 
   // Nothing selected yet — show a friendly empty state instead of a blank panel.
@@ -16,7 +24,8 @@ function SummaryPanel() {
     );
   }
 
-  const { node, summary, cached, isLoading, error } = getSelectedNodeInfo();
+  const node = nodes.find((n) => n.id === selectedNodeId);
+  const { summary, cached, isLoading, error } = summaries[selectedNodeId] || {};
 
   // Selected id exists in the store but the node itself isn't found
   // (shouldn't normally happen, but guards against stale state).
