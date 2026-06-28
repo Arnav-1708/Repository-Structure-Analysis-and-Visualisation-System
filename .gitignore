@@ -18,6 +18,7 @@ dist-ssr
 .idea
 .DS_Store
 cache.db
+.env
 *.suo
 *.ntvs*
 *.njsproj
@@ -25,3 +26,5 @@ cache.db
 *.sw?
 venv/
 node_modules/
+.env
+cache.db
