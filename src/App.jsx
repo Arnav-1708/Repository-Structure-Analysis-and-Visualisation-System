@@ -9,7 +9,7 @@ import "./App.css";
 // In mock mode this path is ignored by graphApi.js, but in real mode
 // it's the actual local folder the backend will scan. We'll later
 // replace this hardcoded value with a user-typed input.
-const DEMO_REPO_PATH = "/Users/demo/sample-repo";
+const DEMO_REPO_PATH = "E:/GDSC_frontend";
 
 function App() {
   const setGraph = useGraphStore((state) => state.setGraph);
