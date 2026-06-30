@@ -6,10 +6,9 @@ import { layoutNodes, layoutEdges } from "./utils/layout";
 import { useGraphStore } from "./store/useGraphStore";
 import "./App.css";
 
-// In mock mode this path is ignored by graphApi.js, but in real mode
-// it's the actual local folder the backend will scan. We'll later
-// replace this hardcoded value with a user-typed input.
-const DEMO_REPO_PATH = "E:/GDSC_frontend";
+// In mock mode this path is ignored by graphApi.js
+// it's the actual local folder the backend will scan.
+const DEMO_REPO_PATH = "E:/CIG_dev";
 
 function App() {
   const setGraph = useGraphStore((state) => state.setGraph);
